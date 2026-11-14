@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Atlas
 
-## Getting Started
+A personal learning environment for transformer concepts — from tokenization and
+attention, through BERT/GPT/Llama, MoE, MLA and Mamba, to biology models
+(Geneformer, scGPT, ESM, AlphaFold, Evo, …), interpretability, and other domains.
 
-First, run the development server:
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # add ANTHROPIC_API_KEY for the tutor
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## What's in it
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Built as a study session, not a documentation site: one concept, one next action, depth on demand.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Page | What it's for |
+|---|---|
+| **Today** (`/`) | Today's queue — due reviews, then practise what you recognise, implement what you can explain, then one new concept whose prerequisites are done. Each item says *why now*. One button: Start session. |
+| **Concept** (`/c/<id>`) | A study workspace with four modes. **Learn** — one question per screen: what it is + why it exists + diagram → intuition → mechanics → why it matters. **Practice** — one question at a time; write your answer, reveal, grade yourself; the tutor can critique your answer. **Implement** — write it from scratch, then compare with the reference. **Graph** — the concept's one-hop neighbourhood. Prerequisites, related concepts and sources sit in the side rail. |
+| **Tutor** (drawer, <kbd>E</kbd>) | Claude, grounded in the page and its graph neighbours. **Go deeper** drafts a new concept page for a sub-topic; you review it, then add it. |
+| **Path** (`/path`) | All concepts in prerequisite order, by track, with "up next". |
+| **Review** (`/review`) | Spaced repetition (FSRS) across all concepts you've started. |
+| **Map** (`/graph`) | Focus (one concept + neighbours; click to move), List, or the Whole map. |
+| **Rebuild from memory** | In a concept's Graph mode, or "Rebuild from memory" on the Map. Its neighbours plus two unrelated concepts arrive shuffled; sort each into *it builds on* / *built on it* / *alternative* / *not connected*. Checking moves every card to where it really belongs and says where you'd put it. "Try a new shuffle" redraws the distractors. |
 
-## Learn More
+Mastery is what you can *do*: Recognize → Explain → Apply → Teach. "Explain" counts a prerequisite as done.
 
-To learn more about Next.js, take a look at the following resources:
+Keyboard: <kbd>L</kbd>/<kbd>P</kbd>/<kbd>I</kbd>/<kbd>G</kbd> switch mode · <kbd>N</kbd> next step · <kbd>Space</kbd> reveal (<kbd>⌘↵</kbd> while typing) · <kbd>1</kbd>–<kbd>4</kbd> grade · <kbd>E</kbd> tutor.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Diagrams** live in `components/diagrams/<concept-id>.tsx` (rules in that folder's README); 20 mechanism-heavy concepts have one. Add a file, run `npm run diagrams`, and check it at `/diagrams`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How it's built
 
-## Deploy on Vercel
+- **Content is plain Markdown** in `content/concepts/<id>.md` — frontmatter for the
+  graph (`requires`, typed `links`, `sources`), five fixed sections for the layers.
+  The format is specified in [`content/SCHEMA.md`](content/SCHEMA.md). Edit a file,
+  reload, done. `npm run check` validates every file (ids, links, sections, cards).
+- **Progress** (mastery + FSRS card state) lives in `data/progress.json`, git-ignored.
+- **Stack:** Next.js 16 (App Router, Cache Components), React Flow, KaTeX,
+  ts-fsrs, Anthropic SDK (`claude-opus-5-5`, streamed, with server-side refusal fallback).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Accuracy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The 68 seed pages were drafted by AI with web verification on recent models, and
+told to omit what they couldn't verify. A few claims are still worth a check
+against the papers — they're listed in [`content/TO-VERIFY.md`](content/TO-VERIFY.md).
+Verify before you memorise.

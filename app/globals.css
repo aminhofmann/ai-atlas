@@ -1,26 +1,198 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@import "@xyflow/react/dist/style.css";
 
+/*
+ * Colour carries meaning, never decoration:
+ *   --accent   the current action (one per screen)
+ *   --due      practice due
+ *   --prereq   "requires" / something to learn first
+ *   --warn     masked / discarded / cost (diagrams)
+ *   --c-*      topic, only as small dots and muted lane tints
+ *   --m-*      mastery ramp, one hue, light → deep
+ * Everything else is neutral.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --bg: #f6f5f1;
+  --panel: #fdfcf9;
+  --panel-2: #efede7;
+  --ink: #23221f;
+  --ink-2: #5b5852;
+  --ink-3: #8f8b82;
+  --line: #e3e0d8;
+  --accent: #4338ca;
+  --accent-soft: #e8e6fb;
+  --accent-ink: #ffffff;
+  --due: #b45309;
+  --due-soft: #fbefdc;
+  --prereq: #0f766e;
+  --warn: #b45309;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --c-foundations: #5b6fb8;
+  --c-training: #3f8f86;
+  --c-architectures: #7d68b8;
+  --c-innovations: #b8774f;
+  --c-biology: #5b8f5e;
+  --c-interpretability: #b0607e;
+  --c-domains: #9a8240;
+
+  --m-new: #d6d2c8;
+  --m-recognize: #c7c3f2;
+  --m-explain: #8f86e6;
+  --m-apply: #5b4fd6;
+  --m-teach: #312a9e;
+
+  --code-bg: #f1efe9;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #151514;
+    --panel: #1c1c1a;
+    --panel-2: #252522;
+    --ink: #ebe9e3;
+    --ink-2: #b3b0a7;
+    --ink-3: #7c7970;
+    --line: #2f2e2a;
+    --accent: #8b85ff;
+    --accent-soft: #26244a;
+    --accent-ink: #12111f;
+    --due: #f0a94b;
+    --due-soft: #3a2a14;
+    --prereq: #4fc4b6;
+    --warn: #f0a94b;
+
+    --c-foundations: #8b9ce0;
+    --c-training: #6fbfb4;
+    --c-architectures: #a897e0;
+    --c-innovations: #d9a27f;
+    --c-biology: #8cbf8e;
+    --c-interpretability: #d98fac;
+    --c-domains: #c9b06e;
+
+    --m-new: #3a3935;
+    --m-recognize: #3c386e;
+    --m-explain: #5a52b8;
+    --m-apply: #847cf0;
+    --m-teach: #b9b3ff;
+
+    --code-bg: #20201d;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-due: var(--due);
+  --color-due-soft: var(--due-soft);
+  --color-prereq: var(--prereq);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-reading);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+kbd {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72em;
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--ink-3);
+}
+
+/* ---- Reading column: serif, 17–18px, ~68 characters ---- */
+.prose-atlas {
+  font-family: var(--font-reading), Georgia, serif;
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  color: var(--ink);
+  max-width: 68ch;
+}
+@media (min-width: 1024px) {
+  .prose-atlas { font-size: 1.125rem; }
+}
+.prose-atlas p,
+.prose-atlas ul,
+.prose-atlas ol,
+.prose-atlas pre,
+.prose-atlas table,
+.prose-atlas .katex-display {
+  margin: 0 0 1.1em;
+}
+.prose-atlas > :last-child { margin-bottom: 0; }
+.prose-atlas h3 {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 1.8em 0 0.5em;
+}
+.prose-atlas ul { list-style: disc; padding-left: 1.3rem; }
+.prose-atlas ol { list-style: decimal; padding-left: 1.3rem; }
+.prose-atlas li { margin: 0.3em 0; }
+.prose-atlas li::marker { color: var(--ink-3); }
+.prose-atlas a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-atlas strong { font-weight: 600; }
+.prose-atlas :not(pre) > code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.82em;
+  background: var(--code-bg);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+}
+.prose-atlas pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  max-width: none;
+}
+.prose-atlas pre code { font-family: var(--font-geist-mono), monospace; background: none; }
+.prose-atlas table { border-collapse: collapse; width: 100%; font-family: var(--font-geist-sans), sans-serif; font-size: 0.9rem; }
+.prose-atlas th, .prose-atlas td { border-bottom: 1px solid var(--line); padding: 0.45rem 0.6rem; text-align: left; }
+.prose-atlas .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.prose-atlas .katex { font-size: 1.05em; }
+
+/* Compact variant for chat, cards and asides */
+.prose-compact { font-size: 0.95rem !important; line-height: 1.6; }
+
+/* highlight.js tokens, theme-aware and quiet */
+.hljs-keyword, .hljs-built_in { color: var(--c-architectures); }
+.hljs-string { color: var(--c-biology); }
+.hljs-number, .hljs-literal { color: var(--c-innovations); }
+.hljs-comment { color: var(--ink-3); font-style: italic; }
+.hljs-title, .hljs-function { color: var(--c-foundations); }
+
+/* React Flow */
+.react-flow { --xy-background-color: transparent; --xy-edge-stroke: var(--line); }
+.react-flow__controls { box-shadow: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.react-flow__controls button { background: var(--panel); border-color: var(--line); color: var(--ink); fill: var(--ink); }
+.react-flow__attribution { display: none; }
+
+/* Calm, short transitions only */
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in { animation: fade-in 180ms ease-out; }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 }
