@@ -1,9 +1,10 @@
 import { getAllConcepts } from "@/lib/content";
-import { deeperSystem } from "@/lib/claude";
+import { deeperSystem, tutorEnabled } from "@/lib/claude";
 import { streamClaude } from "@/lib/stream";
 
 /** Drafts a NEW concept page for a sub-topic of an existing one. Nothing is saved here. */
 export async function POST(req: Request) {
+  if (!tutorEnabled()) return new Response("The tutor is not configured (no ANTHROPIC_API_KEY).", { status: 404 });
   const body = (await req.json().catch(() => null)) as { conceptId?: string; topic?: string } | null;
   const all = getAllConcepts();
   const parent = all.find((c) => c.id === body?.conceptId);

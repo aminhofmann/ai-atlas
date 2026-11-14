@@ -14,6 +14,7 @@ import {
   type LinkType,
   type Source,
 } from "./types";
+import type { PlanConcept } from "./session";
 
 export const CONCEPT_DIR = path.join(process.cwd(), "content", "concepts");
 export const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -132,6 +133,35 @@ export function getGraph(concepts = getAllConcepts()): GraphData {
     for (const l of c.links) add({ from: c.id, to: l.to, type: l.type });
   }
   return { nodes: concepts.map(toMeta), edges };
+}
+
+const WPM = 200;
+const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
+/** The first paragraph of "why it matters" — it states the problem the concept solves. */
+export const firstParagraph = (s: string) => s.trim().split(/\n\s*\n/)[0] ?? "";
+
+/** Minutes for the core read (definition + why + intuition) and the full deep pass. */
+export function studyTime(c: Concept) {
+  const core = words(c.summary) + words(firstParagraph(c.sections.why)) + words(c.sections.intuition);
+  const deep = core + words(c.sections.mechanics) + words(c.sections.why) + words(c.sections.code) * 0.5;
+  return {
+    core: Math.max(2, Math.round(core / WPM + 1)),
+    deep: Math.max(5, Math.round(deep / WPM + c.cards.length * 1.5 + 8)),
+  };
+}
+
+/** What the browser-side planner needs about a concept (see lib/session.ts). */
+export function toPlanConcept(c: Concept): PlanConcept {
+  return {
+    id: c.id,
+    title: c.title,
+    summary: c.summary,
+    category: c.category,
+    requires: c.requires,
+    cardIds: c.cards.map((k) => k.id),
+    hasCode: c.sections.code.includes("```"),
+    coreMinutes: studyTime(c).core,
+  };
 }
 
 /** Prerequisite-first order (Kahn's algorithm on `requires`), level then title as tiebreak. */

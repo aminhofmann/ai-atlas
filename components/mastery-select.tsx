@@ -1,24 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { MASTERY_HINT, MASTERY_LABEL, MASTERY_LEVELS, type Mastery } from "@/lib/types";
+import { masteryOf, setMastery, useProgress } from "@/lib/progress";
 
 /** Self-assessment on what you can DO with the concept. */
-export function MasterySelect({ id, initial }: { id: string; initial: Mastery }) {
-  const [value, setValue] = useState(initial);
-  const router = useRouter();
+export function MasterySelect({ id }: { id: string }) {
+  const value = masteryOf(useProgress(), id);
   const level = MASTERY_LEVELS.indexOf(value);
-
-  async function set(m: Mastery) {
-    setValue(m);
-    await fetch("/api/progress/mastery", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, mastery: m }),
-    });
-    router.refresh();
-  }
+  const set = (m: Mastery) => setMastery(id, m);
 
   return (
     <div>

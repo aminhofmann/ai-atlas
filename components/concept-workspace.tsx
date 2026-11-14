@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { ConceptMeta, Edge, Mastery } from "@/lib/types";
+import type { ConceptMeta, Edge } from "@/lib/types";
 import { PracticeSession, type PracticeCard } from "./practice-session";
 import { LocalGraph } from "./local-graph";
 import { RebuildExercise } from "./rebuild-exercise";
+import { masteryMap, useProgress } from "@/lib/progress";
 import { TutorPanel } from "./tutor-panel";
 
 export type Mode = "learn" | "practice" | "implement" | "graph";
@@ -30,8 +31,10 @@ export function ConceptWorkspace(props: {
   steps: LearnStep[];
   cards: PracticeCard[];
   implement: { brief: ReactNode; solution: ReactNode; code: string } | null;
-  graph: { nodes: ConceptMeta[]; edges: Edge[]; mastery: Record<string, Mastery> };
+  graph: { nodes: ConceptMeta[]; edges: Edge[] };
   nextHref: string;
+  /** Show the Claude tutor (drawer, E key, answer feedback, hints). Off when no API key is configured. */
+  tutor: boolean;
 }) {
   const [mode, setModeState] = useState<Mode>(props.initialMode);
   const [step, setStep] = useState(0);
@@ -39,6 +42,7 @@ export function ConceptWorkspace(props: {
   const [graphView, setGraphView] = useState<"explore" | "rebuild">("explore");
   const [tutorPrompt, setTutorPrompt] = useState<{ text: string; nonce: number } | null>(null);
   const router = useRouter();
+  const mastery = masteryMap(useProgress());
 
   const setMode = useCallback(
     (m: Mode) => {
@@ -69,13 +73,13 @@ export function ConceptWorkspace(props: {
       const k = e.key.toLowerCase();
       const m = MODES.find((x) => x.shortcut.toLowerCase() === k);
       if (m) return setMode(m.key);
-      if (k === "e") return setTutorOpen((o) => !o);
+      if (k === "e" && props.tutor) return setTutorOpen((o) => !o);
       if (mode === "learn" && (k === "n" || e.key === "ArrowRight")) return next();
       if (mode === "learn" && e.key === "ArrowLeft") return setStep((s) => Math.max(0, s - 1));
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, next, setMode]);
+  }, [mode, next, setMode, props.tutor]);
 
   const current = props.steps[step];
 
@@ -103,12 +107,14 @@ export function ConceptWorkspace(props: {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setTutorOpen((o) => !o)}
-          className="mb-2 flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 hover:text-ink"
-        >
-          Ask tutor <kbd>E</kbd>
-        </button>
+        {props.tutor && (
+          <button
+            onClick={() => setTutorOpen((o) => !o)}
+            className="mb-2 flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 hover:text-ink"
+          >
+            Ask tutor <kbd>E</kbd>
+          </button>
+        )}
       </div>
 
       <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_240px]">
@@ -154,13 +160,15 @@ export function ConceptWorkspace(props: {
             <div className="max-w-2xl">
               <PracticeSession
                 cards={props.cards}
-                onAskTutor={askTutor}
+                onAskTutor={props.tutor ? askTutor : undefined}
                 done={props.implement ? { label: "Implement it", onClick: () => setMode("implement") } : { label: "Next in today's session", href: props.nextHref }}
               />
             </div>
           )}
 
-          {mode === "implement" && <Implement data={props.implement} onAskTutor={askTutor} title={props.title} nextHref={props.nextHref} />}
+          {mode === "implement" && (
+            <Implement data={props.implement} onAskTutor={props.tutor ? askTutor : undefined} title={props.title} nextHref={props.nextHref} />
+          )}
 
           {mode === "graph" && (
             <div className="fade-in">
@@ -190,7 +198,7 @@ export function ConceptWorkspace(props: {
                       center={props.id}
                       nodes={props.graph.nodes}
                       edges={props.graph.edges}
-                      mastery={props.graph.mastery}
+                      mastery={mastery}
                       onSelect={(id) => id !== props.id && router.push(`/c/${id}?mode=graph`)}
                     />
                   </div>
@@ -207,15 +215,17 @@ export function ConceptWorkspace(props: {
         <aside className="text-sm lg:sticky lg:top-24 lg:self-start">{props.rail}</aside>
       </div>
 
-      {/* Tutor drawer */}
-      <div
-        className={`fixed inset-y-0 right-0 z-40 w-full max-w-md border-l border-line bg-panel shadow-2xl transition-transform duration-200 ${
-          tutorOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-        aria-hidden={!tutorOpen}
-      >
-        <TutorPanel conceptId={props.id} title={props.title} prompt={tutorPrompt} onClose={() => setTutorOpen(false)} />
-      </div>
+      {/* Tutor drawer — only when an Anthropic API key is configured */}
+      {props.tutor && (
+        <div
+          className={`fixed inset-y-0 right-0 z-40 w-full max-w-md border-l border-line bg-panel shadow-2xl transition-transform duration-200 ${
+            tutorOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+          aria-hidden={!tutorOpen}
+        >
+          <TutorPanel conceptId={props.id} title={props.title} prompt={tutorPrompt} onClose={() => setTutorOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -227,7 +237,7 @@ function Implement({
   nextHref,
 }: {
   data: { brief: ReactNode; solution: ReactNode; code: string } | null;
-  onAskTutor: (t: string) => void;
+  onAskTutor?: (t: string) => void;
   title: string;
   nextHref: string;
 }) {
@@ -246,12 +256,14 @@ function Implement({
         <button onClick={() => setShow((s) => !s)} className="h-11 rounded-xl bg-accent px-5 font-medium text-accent-ink">
           {show ? "Hide reference solution" : "Show reference solution"}
         </button>
-        <button
-          onClick={() => onAskTutor(`I'm implementing ${title} from scratch. Give me a step-by-step plan with hints — but don't write the code for me.`)}
-          className="h-11 rounded-xl border border-line px-5 text-ink-2 hover:text-ink"
-        >
-          Get hints instead
-        </button>
+        {onAskTutor && (
+          <button
+            onClick={() => onAskTutor(`I'm implementing ${title} from scratch. Give me a step-by-step plan with hints — but don't write the code for me.`)}
+            className="h-11 rounded-xl border border-line px-5 text-ink-2 hover:text-ink"
+          >
+            Get hints instead
+          </button>
+        )}
       </div>
 
       {show && (

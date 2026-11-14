@@ -1,3 +1,4 @@
+import { tutorEnabled } from "@/lib/claude";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -6,6 +7,8 @@ import { CATEGORIES } from "@/lib/types";
 
 /** Saves a reviewed "go deeper" draft as a new concept file. Never overwrites. */
 export async function POST(req: Request) {
+  // Writing concept files only works on a local checkout, and only the tutor's "Go deeper" uses it.
+  if (!tutorEnabled()) return Response.json({ error: "Not available without the tutor." }, { status: 404 });
   const body = (await req.json().catch(() => null)) as { markdown?: string } | null;
   let md = (body?.markdown ?? "").trim();
   // Tolerate a stray fence around the whole file.

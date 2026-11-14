@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Card } from "@/lib/types";
 import { Markdown } from "./markdown-client";
+import { reviewCard, type GradeName } from "@/lib/progress";
 
-export type GradeName = "again" | "hard" | "good" | "easy";
+export type { GradeName };
+
 export type PracticeCard = Card & { conceptId?: string; conceptTitle?: string };
 
 const GRADES: { grade: GradeName; label: string; key: string }[] = [
@@ -15,14 +17,6 @@ const GRADES: { grade: GradeName; label: string; key: string }[] = [
   { grade: "easy", label: "Easy", key: "4" },
 ];
 
-async function submitReview(cardId: string, grade: GradeName) {
-  const res = await fetch("/api/progress/review", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ cardId, grade }),
-  });
-  if (!res.ok) throw new Error(`review failed: ${res.status}`);
-}
 
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable);
@@ -52,7 +46,7 @@ export function PracticeSession({
       if (!card || busy) return;
       setBusy(true);
       try {
-        await submitReview(card.id, g);
+        reviewCard(card.id, g);
         if (g === "again") setMissed((n) => n + 1);
         setIndex((i) => i + 1);
       } finally {

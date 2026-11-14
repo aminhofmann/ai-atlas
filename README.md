@@ -8,7 +8,7 @@ attention, through BERT/GPT/Llama, MoE, MLA and Mamba, to biology models
 
 ```bash
 npm install
-cp .env.example .env.local   # add ANTHROPIC_API_KEY for the tutor
+cp .env.example .env.local   # optional: ANTHROPIC_API_KEY turns the tutor on
 npm run dev                  # http://localhost:3000
 ```
 
@@ -20,7 +20,7 @@ Built as a study session, not a documentation site: one concept, one next action
 |---|---|
 | **Today** (`/`) | Today's queue — due reviews, then practise what you recognise, implement what you can explain, then one new concept whose prerequisites are done. Each item says *why now*. One button: Start session. |
 | **Concept** (`/c/<id>`) | A study workspace with four modes. **Learn** — one question per screen: what it is + why it exists + diagram → intuition → mechanics → why it matters. **Practice** — one question at a time; write your answer, reveal, grade yourself; the tutor can critique your answer. **Implement** — write it from scratch, then compare with the reference. **Graph** — the concept's one-hop neighbourhood. Prerequisites, related concepts and sources sit in the side rail. |
-| **Tutor** (drawer, <kbd>E</kbd>) | Claude, grounded in the page and its graph neighbours. **Go deeper** drafts a new concept page for a sub-topic; you review it, then add it. |
+| **Tutor** (drawer, <kbd>E</kbd>) — *optional* | Only shown when `ANTHROPIC_API_KEY` is set; without it the app hides every tutor entry point and works fully offline. Claude, grounded in the page and its graph neighbours; **Go deeper** drafts a new concept page for a sub-topic. |
 | **Path** (`/path`) | All concepts in prerequisite order, by track, with "up next". |
 | **Review** (`/review`) | Spaced repetition (FSRS) across all concepts you've started. |
 | **Map** (`/graph`) | Focus (one concept + neighbours; click to move), List, or the Whole map. |
@@ -38,9 +38,17 @@ Keyboard: <kbd>L</kbd>/<kbd>P</kbd>/<kbd>I</kbd>/<kbd>G</kbd> switch mode · <kb
   graph (`requires`, typed `links`, `sources`), five fixed sections for the layers.
   The format is specified in [`content/SCHEMA.md`](content/SCHEMA.md). Edit a file,
   reload, done. `npm run check` validates every file (ids, links, sections, cards).
-- **Progress** (mastery + FSRS card state) lives in `data/progress.json`, git-ignored.
+- **Progress** (mastery + FSRS card state) lives in the visitor's **browser** (localStorage, `lib/progress.ts`): everyone who opens the hosted app keeps their own progress, with no account and no database. It is per browser — another device starts fresh.
 - **Stack:** Next.js 16 (App Router, Cache Components), React Flow, KaTeX,
   ts-fsrs, Anthropic SDK (`claude-opus-5-5`, streamed, with server-side refusal fallback).
+
+## Hosting (Vercel)
+
+The app is ready for [Vercel](https://vercel.com) with no settings: **Add New → Project → import this repo → Deploy**. Every push to `main` redeploys.
+
+- Content is read from `content/` at build/request time; `next.config.ts` ships that folder with every route.
+- No environment variables are needed. Leave `ANTHROPIC_API_KEY` unset and the tutor stays hidden — set it in Vercel's project settings only if you want the tutor online (it bills your Anthropic account for every visitor's questions).
+- "Go deeper" saves new concept files, which only works on a local checkout, not on a host.
 
 ## Accuracy
 

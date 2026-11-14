@@ -1,22 +1,21 @@
-import "server-only";
-import { learningPath } from "./content";
-import { dueCardIds, readProgress, type Progress } from "./progress";
-import { isSolid, type Category, type Concept, type Mastery } from "./types";
+import type { Progress } from "./progress";
+import { isSolid, type Category, type Mastery } from "./types";
 
-const WPM = 200;
-const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
-/** Paragraph(s) of the "why it matters" section that state the problem — the first one. */
-export const firstParagraph = (s: string) => s.trim().split(/\n\s*\n/)[0] ?? "";
-
-/** Minutes for the core read (definition + why + intuition) and the full deep pass. */
-export function studyTime(c: Concept) {
-  const core = words(c.summary) + words(firstParagraph(c.sections.why)) + words(c.sections.intuition);
-  const deep = core + words(c.sections.mechanics) + words(c.sections.why) + words(c.sections.code) * 0.5;
-  return {
-    core: Math.max(2, Math.round(core / WPM + 1)),
-    deep: Math.max(5, Math.round(deep / WPM + c.cards.length * 1.5 + 8)),
-  };
-}
+/**
+ * The slice of a concept the planner needs — computed on the server at build
+ * time (see `toPlanConcept` in lib/content.ts), then planned in the browser
+ * against the visitor's own progress. Pure functions only: no I/O here.
+ */
+export type PlanConcept = {
+  id: string;
+  title: string;
+  summary: string;
+  category: Category;
+  requires: string[];
+  cardIds: string[];
+  hasCode: boolean;
+  coreMinutes: number;
+};
 
 export type SessionItem = {
   kind: "review" | "learn" | "practice" | "implement";
@@ -26,36 +25,38 @@ export type SessionItem = {
   minutes: number;
 };
 
-export function masteryOf(p: Progress, id: string): Mastery {
-  return p.concepts[id]?.mastery ?? "new";
+const mastery = (p: Progress, id: string): Mastery => p.concepts[id]?.mastery ?? "new";
+
+/** First concept, in path order, that's new and whose prerequisites you can explain. */
+export function nextConcept(path: PlanConcept[], p: Progress): PlanConcept | undefined {
+  const ids = new Set(path.map((c) => c.id));
+  return path.find(
+    (c) => mastery(p, c.id) === "new" && c.requires.every((r) => !ids.has(r) || isSolid(p.concepts[r]?.mastery)),
+  );
 }
 
 /**
  * Today's queue, in the order it should be done: what's due first (forgetting
  * is the expensive failure), then deepen what's in progress, then one new thing.
  */
-export function buildSession() {
-  const progress = readProgress();
-  const path = learningPath();
+export function buildSession(path: PlanConcept[], p: Progress, due: string[]) {
   const byId = new Map(path.map((c) => [c.id, c]));
   const items: SessionItem[] = [];
 
-  const due = dueCardIds(path.flatMap((c) => c.cards.map((k) => k.id)));
   if (due.length) {
-    const concepts = [...new Set(due.map((d) => d.split("#")[0]))].map((id) => byId.get(id)?.title).filter(Boolean);
+    const titles = [...new Set(due.map((d) => d.split("#")[0]))].map((id) => byId.get(id)?.title).filter(Boolean);
     items.push({
       kind: "review",
-      title: concepts.length === 1 ? concepts[0]! : `${concepts[0]} and ${concepts.length - 1} more`,
+      title: titles.length === 1 ? titles[0]! : `${titles[0]} and ${titles.length - 1} more`,
       why: `${due.length} card${due.length === 1 ? "" : "s"} due — reviewing now is cheaper than relearning later.`,
       href: "/review",
       minutes: Math.max(2, Math.round(due.length * 0.6)),
     });
   }
 
-  // In progress: recognised but not yet explainable → practice it.
   const inProgress = path
-    .filter((c) => masteryOf(progress, c.id) === "recognize")
-    .sort((a, b) => (progress.concepts[b.id]?.updatedAt ?? "").localeCompare(progress.concepts[a.id]?.updatedAt ?? ""));
+    .filter((c) => mastery(p, c.id) === "recognize")
+    .sort((a, b) => (p.concepts[b.id]?.updatedAt ?? "").localeCompare(p.concepts[a.id]?.updatedAt ?? ""));
   if (inProgress[0]) {
     const c = inProgress[0];
     items.push({
@@ -63,12 +64,11 @@ export function buildSession() {
       title: c.title,
       why: "You recognise it — explaining it from memory is what makes it stick.",
       href: `/c/${c.id}?mode=practice`,
-      minutes: Math.max(3, Math.round(c.cards.length * 1.5)),
+      minutes: Math.max(3, Math.round(c.cardIds.length * 1.5)),
     });
   }
 
-  // Can explain but not yet apply, and has code → implement it.
-  const implementable = path.find((c) => masteryOf(progress, c.id) === "explain" && c.sections.code.includes("```"));
+  const implementable = path.find((c) => mastery(p, c.id) === "explain" && c.hasCode);
   if (implementable) {
     items.push({
       kind: "implement",
@@ -79,8 +79,7 @@ export function buildSession() {
     });
   }
 
-  // Next new concept whose prerequisites are solid.
-  const next = nextConcept(path, progress);
+  const next = nextConcept(path, p);
   if (next) {
     const reqs = next.requires.map((r) => byId.get(r)?.title).filter(Boolean);
     items.push({
@@ -90,30 +89,16 @@ export function buildSession() {
         ? `Its prerequisites (${reqs.slice(0, 2).join(", ")}${reqs.length > 2 ? "…" : ""}) are done.`
         : "A starting point — it needs nothing else first.",
       href: `/c/${next.id}?mode=learn`,
-      minutes: studyTime(next).core + 5,
+      minutes: next.coreMinutes + 5,
     });
   }
 
-  // Current track = topic of the next concept; milestone = that topic at "explain" or better.
   const track: Category | null = next?.category ?? inProgress[0]?.category ?? null;
   const inTrack = track ? path.filter((c) => c.category === track) : [];
-  const solidInTrack = inTrack.filter((c) => isSolid(progress.concepts[c.id]?.mastery)).length;
-
   return {
     items,
     totalMinutes: items.reduce((s, i) => s + i.minutes, 0),
-    dueCount: due.length,
     track,
-    trackProgress: { done: solidInTrack, total: inTrack.length },
-    next,
+    trackProgress: { done: inTrack.filter((c) => isSolid(p.concepts[c.id]?.mastery)).length, total: inTrack.length },
   };
-}
-
-export function nextConcept(path: Concept[], progress: Progress): Concept | undefined {
-  const ids = new Set(path.map((c) => c.id));
-  return path.find(
-    (c) =>
-      masteryOf(progress, c.id) === "new" &&
-      c.requires.every((r) => !ids.has(r) || isSolid(progress.concepts[r]?.mastery)),
-  );
 }

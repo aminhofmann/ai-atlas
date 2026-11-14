@@ -2,16 +2,16 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { getAllConcepts, getGraph, learningPath } from "@/lib/content";
-import { readProgress } from "@/lib/progress";
+import { firstParagraph, getAllConcepts, getGraph, studyTime } from "@/lib/content";
 import { relationsOf } from "@/lib/relations";
-import { firstParagraph, nextConcept, studyTime } from "@/lib/session";
-import type { Concept, Mastery } from "@/lib/types";
+import type { Concept } from "@/lib/types";
 import { Markdown } from "@/components/markdown";
 import { CategoryTag, categoryColor, LEVEL_LABEL } from "@/components/category";
 import { MasterySelect } from "@/components/mastery-select";
+import { MasteryDot } from "@/components/mastery-dot";
 import { ConceptWorkspace, type LearnStep, type Mode } from "@/components/concept-workspace";
 import { getDiagram } from "@/components/diagrams";
+import { tutorEnabled } from "@/lib/claude";
 
 const MODES: Mode[] = ["learn", "practice", "implement", "graph"];
 
@@ -33,12 +33,12 @@ function DiagramFigure({ id }: { id: string }) {
   );
 }
 
-function RailLink({ c, mastery }: { c: Concept; mastery: Mastery }) {
+function RailLink({ c }: { c: Concept }) {
   return (
     <Link href={`/c/${c.id}`} className="group flex items-center gap-2 py-1">
       <span className="size-1.5 shrink-0 rounded-full" style={{ background: categoryColor(c.category) }} />
       <span className="min-w-0 flex-1 truncate text-ink-2 group-hover:text-ink">{c.title}</span>
-      {mastery !== "new" && <span className="size-1.5 shrink-0 rounded-full" style={{ background: `var(--m-${mastery})` }} />}
+      <MasteryDot id={c.id} />
     </Link>
   );
 }
@@ -51,11 +51,6 @@ async function ConceptPage({ params, searchParams }: { params: Promise<{ id: str
   const c = byId.get(id);
   if (!c) notFound();
 
-  const progress = readProgress();
-  const masteryMap: Record<string, Mastery> = Object.fromEntries(
-    Object.entries(progress.concepts).map(([k, v]) => [k, v.mastery]),
-  );
-  const m = (cid: string) => masteryMap[cid] ?? "new";
   const graph = getGraph(all);
   const time = studyTime(c);
   const hasDiagram = !!getDiagram(id);
@@ -127,8 +122,8 @@ async function ConceptPage({ params, searchParams }: { params: Promise<{ id: str
   }
   const relatedCount = [...related.values()].reduce((s, l) => s + l.length, 0);
 
-  const next = nextConcept(learningPath(all), progress);
-  const nextHref = next && next.id !== id ? `/c/${next.id}?mode=learn` : "/";
+  // "What's next" depends on the visitor's progress, which only the browser knows — Today plans it.
+  const nextHref = "/";
 
   const header = (
     <header>
@@ -148,16 +143,16 @@ async function ConceptPage({ params, searchParams }: { params: Promise<{ id: str
     <div className="space-y-7">
       <section>
         <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-3">I can…</h3>
-        <MasterySelect id={id} initial={m(id)} />
+        <MasterySelect id={id} />
       </section>
       <section>
         <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-prereq">Learn first</h3>
-        {prereqs.length ? prereqs.map((p) => <RailLink key={p.id} c={p} mastery={m(p.id)} />) : <p className="py-1 text-ink-3">Nothing — a starting point.</p>}
+        {prereqs.length ? prereqs.map((p) => <RailLink key={p.id} c={p} />) : <p className="py-1 text-ink-3">Nothing — a starting point.</p>}
       </section>
       {unlocks.length > 0 && (
         <section>
           <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-ink-3">Unlocks</h3>
-          {unlocks.slice(0, 5).map((p) => <RailLink key={p.id} c={p} mastery={m(p.id)} />)}
+          {unlocks.slice(0, 5).map((p) => <RailLink key={p.id} c={p} />)}
           {unlocks.length > 5 && <p className="py-1 text-xs text-ink-3">+{unlocks.length - 5} more in Graph</p>}
         </section>
       )}
@@ -170,7 +165,7 @@ async function ConceptPage({ params, searchParams }: { params: Promise<{ id: str
             {[...related.entries()].map(([phrase, items]) => (
               <div key={phrase}>
                 <p className="text-xs text-ink-3">{phrase}</p>
-                {items.map((p) => <RailLink key={p.id} c={p} mastery={m(p.id)} />)}
+                {items.map((p) => <RailLink key={p.id} c={p} />)}
               </div>
             ))}
           </div>
@@ -210,8 +205,9 @@ async function ConceptPage({ params, searchParams }: { params: Promise<{ id: str
       steps={steps}
       cards={c.cards}
       implement={implement}
-      graph={{ nodes: graph.nodes, edges: graph.edges, mastery: masteryMap }}
+      graph={{ nodes: graph.nodes, edges: graph.edges }}
       nextHref={nextHref}
+      tutor={tutorEnabled()}
     />
   );
 }

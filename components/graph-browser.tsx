@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CATEGORIES, CATEGORY_LABEL, type GraphData, type Mastery } from "@/lib/types";
+import { CATEGORIES, CATEGORY_LABEL, type GraphData } from "@/lib/types";
+import { masteryMap, useProgress } from "@/lib/progress";
+import { nextConcept, type PlanConcept } from "@/lib/session";
 import { LocalGraph } from "./local-graph";
 import { RebuildExercise } from "./rebuild-exercise";
 import { GraphExplorer } from "./graph-explorer";
@@ -17,26 +19,36 @@ type View = "focus" | "list" | "map";
  */
 export function GraphBrowser({
   data,
-  mastery,
+  path,
   start,
 }: {
   data: GraphData;
-  mastery: Record<string, Mastery>;
-  start: string;
+  /** Concepts in learning-path order — used to open on what you'd study next. */
+  path: PlanConcept[];
+  /** Concept requested in the URL (?c=), if any. */
+  start: string | null;
 }) {
+  const progress = useProgress();
+  const mastery = masteryMap(progress);
   const [view, setView] = useState<View>("focus");
-  const [trail, setTrail] = useState<string[]>([start]);
+  const [trail, setTrail] = useState<string[]>(start ? [start] : []);
   const [query, setQuery] = useState("");
   const [testing, setTesting] = useState(false);
-  const center = trail[trail.length - 1];
+  // Without ?c=, open on the visitor's next concept (needs their browser progress), else the first.
+  const center = trail[trail.length - 1] ?? nextConcept(path, progress)?.id ?? data.nodes[0]?.id;
   const byId = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
   const c = byId.get(center);
+  const shownTrail = trail.length ? trail : [center];
 
-  const go = (id: string) => setTrail((t) => (t.includes(id) ? t.slice(0, t.indexOf(id) + 1) : [...t, id].slice(-6)));
+  const go = (id: string) =>
+    setTrail((t) => {
+      const base = t.length ? t : [center];
+      return base.includes(id) ? base.slice(0, base.indexOf(id) + 1) : [...base, id].slice(-6);
+    });
 
   useEffect(() => {
-    window.history.replaceState(null, "", `/graph?c=${center}`);
-  }, [center]);
+    if (trail.length) window.history.replaceState(null, "", `/graph?c=${center}`);
+  }, [center, trail.length]);
 
   const q = query.trim().toLowerCase();
   const hits = q
@@ -92,10 +104,10 @@ export function GraphBrowser({
       {view === "focus" && c && (
         <div className="mx-auto w-full max-w-6xl px-5 py-6 fade-in">
           <nav className="flex flex-wrap items-center gap-1 text-sm text-ink-3" aria-label="Path through the map">
-            {trail.map((id, i) => (
+            {shownTrail.map((id, i) => (
               <span key={id} className="flex items-center gap-1">
                 {i > 0 && <span>›</span>}
-                <button onClick={() => go(id)} className={i === trail.length - 1 ? "text-ink" : "hover:text-ink"}>
+                <button onClick={() => go(id)} className={i === shownTrail.length - 1 ? "text-ink" : "hover:text-ink"}>
                   {byId.get(id)?.title}
                 </button>
               </span>

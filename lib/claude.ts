@@ -6,6 +6,14 @@ import type { Concept } from "./types";
 
 export const MODEL = "claude-opus-5-5";
 
+/**
+ * The tutor is optional: without an API key the app hides it entirely
+ * (drawer, E shortcut, answer feedback, hints) instead of showing a broken chat.
+ */
+export function tutorEnabled() {
+  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
+
 let client: Anthropic | null = null;
 export function claude() {
   // Reads ANTHROPIC_API_KEY (or an `ant auth login` profile) from the environment.
